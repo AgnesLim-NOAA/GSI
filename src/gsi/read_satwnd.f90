@@ -73,6 +73,10 @@ subroutine read_satwnd(nread,ndata,nodata,infile,obstype,lunout,gstime,twind,sis
 !                         or hilber curve downweighting
 ! 
 !   2020-05-04  wu   - no rotate_wind for fv3_regional
+!   2020-08-03  Lim     - Additon of GOES-16/17 SWIR and VIS to HWRF. Revise error
+!                       - profile for GOES-16 AMVs in HWRF.    
+!   2021-02-25  Lim     - Addition of all five types of GOES-16/17 15 min AMVs to HWRF.
+!   
 !
 !   
 !
@@ -481,6 +485,21 @@ subroutine read_satwnd(nread,ndata,nodata,infile,obstype,lunout,gstime,twind,sis
               itype=246
            else if(trim(subset) == 'NC005031')  then            ! WV clear sky/deep layer
               itype=247
+           endif
+!       This data types are for CONUS winds. wrf_nmm_regional use as a placeholder for HAFS. Additional option can be
+!       to switch the CONUS winds on/off.
+        else if(wrf_nmm_regional .and. (trim(subset) == 'NC005052' .or. trim(subset) == 'NC005053' .or. &
+                trim(subset) == 'NC005054' .or. trim(subset) == 'NC005055' .or. trim(subset) == 'NC005056') then
+           if(trim(subset) == 'NC005052')then     ! IR LW winds
+               itype=245
+           else if(trim(subset) == 'NC005056')then! IR SW winds
+               itype=240
+           else if(trim(subset) == 'NC005054')then! VIS winds
+               itype=251
+           else if(trim(subset) == 'NC005055')then! WV cloud top
+               itype=246
+           else if(trim(subset) == 'NC005053')then! WV clearsky/deep layer
+               itype=247
            endif
         else ! wind is not recognised and itype is not assigned
            cycle loop_report
@@ -1069,7 +1088,78 @@ subroutine read_satwnd(nread,ndata,nodata,infile,obstype,lunout,gstime,twind,sis
                  ee = amvqic(2,4) ! NOTE: GOES-R's ee is in [m/s]
               endif
 ! Extra block for VIIRS NOAA20: End
-! Extra block for GOES-R winds: Start
+! Extra block for 15min GOES-R Wind. wrf_nmm_regional use as placeholder for
+! HAFS. Additional option can be added to switch the CONUS winds on/off
+           else if(wrf_nmm_regional .and. (trim(subset) == 'NC005052' .or. trim(subset) == 'NC005053' .or. &
+                    trim(subset) == 'NC005054' .or. trim(subset) == 'NC005055' .or. trim(subset) == 'NC005056'))then
+                 if(hdrdat(1) >=r250 .and. hdrdat(1) <=r299 ) then  ! the range ofNESDIS satellite IDs
+                                                                    ! The sample newBUF SAID=259 (GOES-15)
+                                                                    ! When GOES-R SAID is assigned, pls check if this
+                                                                    ! range is still
+                                                                    ! valid (Genkova)) 
+                 c_prvstg='NESDIS'
+
+                 if(hdrdat(10) >68.0_r_kind) cycle loop_readsb   !   reject data zenith angle >68.0 degree
+                 if(trim(subset) == 'NC005052') then          ! IR LW winds
+                    itype=245
+                    c_station_id='IR'//stationid
+                    c_sprvstg='IR'
+                 else if(trim(subset) == 'NC005056')  then     ! IR SW winds
+                    itype=240
+                    c_station_id='IR'//stationid
+                    c_sprvstg='IR'
+                 else if(trim(subset) =='NC005054')  then     ! VIS winds
+                    itype=251
+                    c_station_id='VI'//stationid
+                    c_sprvstg='VI'
+                 else if(trim(subset) =='NC005055')  then     ! WV cloud top
+                    itype=246
+                    c_station_id='WV'//stationid
+                    c_sprvstg='WV'
+                 else if(trim(subset) =='NC005053')  then     ! WV clear sky/deep layer
+                    itype=247
+                    c_station_id='WV'//stationid
+                    c_sprvstg='WV'
+                 endif
+                 call ufbint(lunin,rep_array,1,1,iret, '{AMVIVR}')
+                 irep_array = int(rep_array)
+                 allocate( amvivr(2,irep_array))
+                 call ufbrep(lunin,amvivr,2,irep_array,iret, 'TCOV CVWD')
+                 pct1 = amvivr(2,1)     ! use of pct1 (a new variable in the BUFR) is introduced by Nebuda/Genkova
+                 deallocate( amvivr )
+
+                 call ufbseq(lunin,amvqic,2,4,iret, 'AMVQIC')
+                 qifn = amvqic(2,2)  ! QI w/ fcst does not exist in this BUFR
+                 ee = amvqic(2,4) ! NOTE: GOES-R's ee is in [m/s]
+
+                 if (qifn > r100 )   qm=15 !QI missing value check
+                 if (ppb < 125.0_r_kind) qm=15 !reject data above 125hPa: Trop check in setup.f90
+                 experr_norm = 10.0_r_kind - 0.1_r_kind * ee   ! introduced by Santek/Nebuda 
+                 if (obsdat(4) > 0.1_r_kind) then  ! obsdat(4) is the AMV speed
+                    experr_norm = experr_norm/obsdat(4)
+                 else
+                    experr_norm = 100.0_r_kind
+                 end if
+                 if (experr_norm > 0.9_r_kind) qm=15 ! reject data with EE/SPD>0.9
+
+                 ! type 251 has been determine not suitable to be subjected to
+                 ! pct1 range check
+                 if(itype==240 .or. itype==245 .or. itype==246 .or. itype==251) then
+                       if (pct1 > 0.50_r_kind) qm=15
+                 endif
+                ! winds rejected by qc dont get used
+                if (qm == 15) usage=r100
+                if (qm == 3 .or. qm ==7) woe=woe*r1_2
+                ! set strings for diagnostic output
+                if(itype==240 )  then;  c_prvstg='GOESR' ; c_sprvstg='IRSW'  ; endif
+                if(itype==245 )  then;  c_prvstg='GOESR' ; c_sprvstg='IR'  ;   endif
+                if(itype==246 )  then;  c_prvstg='GOESR' ; c_sprvstg='WVCT'  ; endif
+                if(itype==247 )  then;  c_prvstg='GOESR' ; c_sprvstg='WVCS'  ; endif
+                if(itype==251 )  then;  c_prvstg='GOESR' ; c_sprvstg='VIS'  ;  endif
+
+           endif ! SAID loop
+!          End of extra block for 15 min GOES-R winds. This is for HWRF wrf_nmm_regional)
+! Extra block for hourly GOES-R winds. Same between global and regional : Start
            else if(trim(subset) == 'NC005030' .or. trim(subset) == 'NC005031' .or. trim(subset) == 'NC005032' .or. &  !IR(LW) / CS WV / VIS  GOES-R like winds        
                    trim(subset) == 'NC005034' .or. trim(subset) == 'NC005039' ) then                                  !CT WV  / IR(SW) GOES-R like winds        
 
@@ -1136,7 +1226,9 @@ subroutine read_satwnd(nread,ndata,nodata,infile,obstype,lunout,gstime,twind,sis
                  ee = amvqic(2,4) ! NOTE: GOES-R's ee is in [m/s]
 
 ! Additional QC introduced by Sharon Nebuda (for GOES-R winds from MSG proxy images)
-                 if (qifn < 80_r_kind .or. qifn > r100 )   qm=15 !reject data with low QI
+                 if( .not. wrf_nmm_regional) then
+                    if (qifn < 80_r_kind .or. qifn > r100 )   qm=15 !reject data with low QI
+                 end if
                  if (ppb < 125.0_r_kind) qm=15 !reject data above 125hPa: Trop check in setup.f90
                  experr_norm = 10.0_r_kind - 0.1_r_kind * ee   ! introduced by Santek/Nebuda 
                  if (obsdat(4) > 0.1_r_kind) then  ! obsdat(4) is the AMV speed
@@ -1162,16 +1254,19 @@ subroutine read_satwnd(nread,ndata,nodata,infile,obstype,lunout,gstime,twind,sis
                     endif
                  endif
 
-! GOES-16 additional QC addopting ECMWF's approach(Katie Lean,14IWW)-start
-                 if (EC_AMV_QC) then 
-                    if (qifn < 90_r_kind .or. qifn > r100 )   qm=15 ! stricter QI
-                    if (ppb < 150.0_r_kind) qm=15                   ! all high level
-                    if (itype==251 .and. ppb < 700.0_r_kind) qm=15  ! VIS
-                    if (itype==246 .and. ppb > 300.0_r_kind) qm=15  ! WVCA 
-                    dlon_earth=hdrdat(3)*deg2rad
-                    dlat_earth=hdrdat(2)*deg2rad
-                    call deter_sfc_type(dlat_earth,dlon_earth,t4dv,isflg,tsavg)
-                    if (isflg == 1 .and. ppb > 850.0_r_kind) qm=15  ! low over land
+! GOES-16 additional QC addopting ECMWF's approach(Katie Lean,14IWW). This
+! approach not for HWRF-start
+                 if(.not. wrf_nmm_regional) then 
+                    if (EC_AMV_QC) then 
+                       if (qifn < 90_r_kind .or. qifn > r100 )   qm=15 ! stricter QI
+                       if (ppb < 150.0_r_kind) qm=15                   ! all high level
+                       if (itype==251 .and. ppb < 700.0_r_kind) qm=15  ! VIS
+                       if (itype==246 .and. ppb > 300.0_r_kind) qm=15  ! WVCA 
+                       dlon_earth=hdrdat(3)*deg2rad
+                       dlat_earth=hdrdat(2)*deg2rad
+                       call deter_sfc_type(dlat_earth,dlon_earth,t4dv,isflg,tsavg)
+                       if (isflg == 1 .and. ppb > 850.0_r_kind) qm=15  ! low over land
+                    endif
                  endif
 
                  ! winds rejected by qc dont get used
@@ -1359,9 +1454,12 @@ subroutine read_satwnd(nread,ndata,nodata,infile,obstype,lunout,gstime,twind,sis
 ! Reduce OE for the GOES-R winds by half following Sharon Nebuda's work
 ! GOES-R wind are identified/recognised here by subset, but it could be done by itype or SAID
 ! After completing the evaluation of GOES-R winds, REVISE this section!!!
-           if(trim(subset) == 'NC005030' .or. trim(subset) == 'NC005031' .or. trim(subset) == 'NC005032' .or. &  
-               trim(subset) == 'NC005034' .or. trim(subset) == 'NC005039' ) then  
-              obserr=obserr/two
+! This is not for HWRF.
+           if( .not. wrf_nmm_regional) then
+             if(trim(subset) == 'NC005030' .or. trim(subset) == 'NC005031' .or. trim(subset) == 'NC005032' .or. &  
+                trim(subset) == 'NC005034' .or. trim(subset) == 'NC005039' ) then  
+                  obserr=obserr/two
+             endif
            endif
 
 !         Set usage variable
