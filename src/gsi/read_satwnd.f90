@@ -114,7 +114,7 @@ subroutine read_satwnd(nread,ndata,nodata,infile,obstype,lunout,gstime,twind,sis
   use converr,only: etabl
   use converr_uv,only: etabl_uv,isuble_uv,maxsub_uv
   use convb_uv,only: btabl_uv
-  use obsmod, only: perturb_obs,perturb_fact,ran01dom,bmiss
+  use obsmod, only: perturb_obs,perturb_fact,ran01dom,bmiss,hurricane_amv
   use convinfo, only: nconvtype, &
        icuse,ictype,icsubtype,ioctype, &
        ithin_conv,rmesh_conv,pmesh_conv,pmot_conv,ptime_conv, &
@@ -456,8 +456,12 @@ subroutine read_satwnd(nread,ndata,nodata,infile,obstype,lunout,gstime,twind,sis
 
 
         !GOES-R section of the 'if' statement over 'subsets' 
+!       The global BUFR files and HWRF BUFR files are not the same. This does
+!       not cause global to read redundant obs.
         else if(trim(subset) == 'NC005030' .or. trim(subset) == 'NC005031' .or. trim(subset) == 'NC005032' .or. &
-                trim(subset) == 'NC005034' .or. trim(subset) == 'NC005039') then
+                trim(subset) == 'NC005034' .or. trim(subset) == 'NC005039' .or. trim(subset) == 'NC005052' .or. &
+                trim(subset) == 'NC005053' .or. trim(subset) == 'NC005054' .or. trim(subset) == 'NC005055' .or. &
+                trim(subset) == 'NC005056') then
 ! Commented out, because we need clarification for SWCM/hdrdat(9) from Yi Song
 ! NOTE: Once it is confirmed that SWCM values are sensible, apply this logic and replace lines 685-702
 !                 if(hdrdat(9) == one)  then
@@ -475,31 +479,16 @@ subroutine read_satwnd(nread,ndata,nodata,infile,obstype,lunout,gstime,twind,sis
 !                 endif
 
 !Temporary solution replacing the commented code above
-           if(trim(subset) == 'NC005030')  then                 ! IR LW winds
+           if(trim(subset) == 'NC005030' .or. trim(subset) == 'NC005052')  then                 ! IR LW winds
               itype=245
-           else if(trim(subset) == 'NC005039')  then            ! IR SW winds
+           else if(trim(subset) == 'NC005039' .or. trim(subset) == 'NC005056')  then            ! IR SW winds
               itype=240                                      
-           else if(trim(subset) == 'NC005032')  then            ! VIS winds
+           else if(trim(subset) == 'NC005032' .or. trim(subset) == 'NC005054')  then            ! VIS winds
               itype=251
-           else if(trim(subset) == 'NC005034')  then            ! WV cloud top
+           else if(trim(subset) == 'NC005034' .or. trim(subset) == 'NC005055')  then            ! WV cloud top
               itype=246
-           else if(trim(subset) == 'NC005031')  then            ! WV clear sky/deep layer
+           else if(trim(subset) == 'NC005031' .or. trim(subset) == 'NC005053')  then            ! WV clear sky/deep layer
               itype=247
-           endif
-!       This data types are for CONUS winds. wrf_nmm_regional use as a placeholder for HAFS. Additional option can be
-!       to switch the CONUS winds on/off.
-        else if(wrf_nmm_regional .and. (trim(subset) == 'NC005052' .or. trim(subset) == 'NC005053' .or. &
-                trim(subset) == 'NC005054' .or. trim(subset) == 'NC005055' .or. trim(subset) == 'NC005056') then
-           if(trim(subset) == 'NC005052')then     ! IR LW winds
-               itype=245
-           else if(trim(subset) == 'NC005056')then! IR SW winds
-               itype=240
-           else if(trim(subset) == 'NC005054')then! VIS winds
-               itype=251
-           else if(trim(subset) == 'NC005055')then! WV cloud top
-               itype=246
-           else if(trim(subset) == 'NC005053')then! WV clearsky/deep layer
-               itype=247
            endif
         else ! wind is not recognised and itype is not assigned
            cycle loop_report
@@ -545,7 +534,7 @@ subroutine read_satwnd(nread,ndata,nodata,infile,obstype,lunout,gstime,twind,sis
            tab(ntb,2)=nx
            tab(ntb,3)=1
            lmsg(nmsg,nx) = .true.
-        end if
+        endif
      enddo loop_report
   enddo msg_report
 
@@ -1088,9 +1077,9 @@ subroutine read_satwnd(nread,ndata,nodata,infile,obstype,lunout,gstime,twind,sis
                  ee = amvqic(2,4) ! NOTE: GOES-R's ee is in [m/s]
               endif
 ! Extra block for VIIRS NOAA20: End
-! Extra block for 15min GOES-R Wind. wrf_nmm_regional use as placeholder for
+! Extra block for 15min GOES-R Winds.
 ! HAFS. Additional option can be added to switch the CONUS winds on/off
-           else if(wrf_nmm_regional .and. (trim(subset) == 'NC005052' .or. trim(subset) == 'NC005053' .or. &
+           else if(hurricane_amv .and. (trim(subset) == 'NC005052' .or. trim(subset) == 'NC005053' .or. &
                     trim(subset) == 'NC005054' .or. trim(subset) == 'NC005055' .or. trim(subset) == 'NC005056'))then
                  if(hdrdat(1) >=r250 .and. hdrdat(1) <=r299 ) then  ! the range ofNESDIS satellite IDs
                                                                     ! The sample newBUF SAID=259 (GOES-15)
