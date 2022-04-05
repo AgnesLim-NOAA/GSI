@@ -1147,7 +1147,7 @@ subroutine read_satwnd(nread,ndata,nodata,infile,obstype,lunout,gstime,twind,sis
                 if(itype==251 )  then;  c_prvstg='GOESR' ; c_sprvstg='VIS'  ;  endif
 
            endif ! SAID loop
-!          End of extra block for 15 min GOES-R winds. This is for HWRF wrf_nmm_regional)
+!          End of extra block for 15 min GOES-R winds.
 ! Extra block for hourly GOES-R winds. Same between global and regional : Start
            else if(trim(subset) == 'NC005030' .or. trim(subset) == 'NC005031' .or. trim(subset) == 'NC005032' .or. &  !IR(LW) / CS WV / VIS  GOES-R like winds        
                    trim(subset) == 'NC005034' .or. trim(subset) == 'NC005039' ) then                                  !CT WV  / IR(SW) GOES-R like winds        
