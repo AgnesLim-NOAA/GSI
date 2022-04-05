@@ -27,7 +27,7 @@
      rmesh_vr,zmesh_dbz,zmesh_vr,if_vterminal, if_model_dbz,if_vrobs_raw,&
      minobrangedbz,maxobrangedbz,maxobrangevr,maxtiltvr,missing_to_nopcp,&
      ntilt_radarfiles,whichradar,&
-     minobrangevr,maxtiltdbz,mintiltvr,mintiltdbz,l2rwthin,hurricane_radar 
+     minobrangevr,maxtiltdbz,mintiltvr,mintiltdbz,l2rwthin,hurricane_radar,hurricane_amv 
 
   use obsmod, only: lwrite_predterms, &
      lwrite_peakwt,use_limit,lrun_subdirs,l_foreaft_thin,lobsdiag_forenkf,&
@@ -483,6 +483,9 @@
 !  01-07-2022 Hu        Add fv3_io_layout_y to let fv3lam interface read/write subdomain restart
 !                       files. The fv3_io_layout_y needs to match fv3lam model
 !                       option io_layout(2).
+!  03-25-2022 Lim       Add hurricane_amv logic to OBS_INPUT to switch on GOES-R
+!                       15-minute AMVs for hurricane model!  
+!                       
 !
 !EOP
 !-------------------------------------------------------------------------
@@ -699,6 +702,7 @@
 !                     (.TRUE.: on; .FALSE.: off) / Inputfile: l2rwbufr_cltl (bufr format)
 !     l_use_dbz_directDA - option to assimilate radar reflectivity obs directly in GSI 
 !                     (.TRUE.: on; .FALSE.: off) / Inputfile: dbzbufr (bufr format)
+!      hurricane_amv    - logical for actively assimilation of GOES-R 15-minute ANVs for hurricane model
 !
 !     NOTE:  for now, if in regional mode, then iguess=-1 is forced internally.
 !            add use of guess file later for regional mode.
@@ -743,6 +747,7 @@
        if_model_dbz,imp_physics,lupp,netcdf_diag,binary_diag,l_wcp_cwm,aircraft_recon,diag_version,&
        write_fv3_incr,incvars_to_zero,incvars_zero_strat,incvars_efold,diag_version,&
        cao_check,lcalc_gfdl_cfrac,tau_fcst,efsoi_order,lupdqc,lqcoef,cnvw_option,l2rwthin,hurricane_radar,&
+       hurricane_amv,&
        l_reg_update_hydro_delz, &
        l_use_dbz_directDA, l_use_rw_columntilt
 

@@ -157,6 +157,7 @@ module obsmod
 !                          GSI namelist level.  
 !  2020-09-15  Wu        - add option tcp_posmatch to mitigate possibility of erroneous TC initialization
 !  2020-09-19  CAPS(J. Park) - add 'vad_near_analtime' flag to assimilate newvad obs around analysis time only
+!  2022-03-25  Lim       - add option hurricane_amv to turn on GOES-R 15-minute AMVs
 ! 
 ! Subroutines Included:
 !   sub init_obsmod_dflts   - initialize obs related variables to default values
@@ -405,6 +406,7 @@ module obsmod
 !   def use_similarity_2dvar - logical, if .true., then use similarity theory from mm5
 !                              sfc model to compute the 10m-wind factor
 !   def aircraft_recon - namelist logibal whether to use DOE for aircraft
+!   def hurricane_amv - namelist logical whether to use GOES-R 15-minute AMVs
 !
 ! attributes:
 !   langauge: f90
@@ -488,6 +490,7 @@ module obsmod
   public :: l_wcp_cwm
   public :: aircraft_recon
   public :: hurricane_radar 
+  public :: hurricane_amv 
 
   ! The following public variables are the coefficients that describe
   ! the linear regression fits that are used to define the dynamic
@@ -646,6 +649,7 @@ module obsmod
   logical l_wcp_cwm
   logical aircraft_recon
   logical hurricane_radar 
+  logical hurricane_amv
 
   character(len=*),parameter:: myname='obsmod'
 
@@ -914,6 +918,7 @@ contains
     l_wcp_cwm          = .false.                 ! .true. = use operator that involves cwm
     aircraft_recon     = .false.                 ! .true. = use DOE for aircraft data
     hurricane_radar    = .false.                 ! .true. = use radar data for hurricane application 
+    hurricane_amv      = .false.                 ! .true. = use GOES-R 15 minute AMVs for hurricane application
 
     ! The following variable initializations pertain to the
     ! coefficients that describe the linear regression fits that are
